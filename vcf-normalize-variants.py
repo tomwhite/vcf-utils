@@ -25,9 +25,19 @@ def open_vcf(path) -> Iterator[cyvcf2.VCF]:
         vcf.close()
 
 
-def variants_are_equivalent(variant1, variant2):
-    """Test if two variants are equivalent"""
-    return variant1.CHROM == variant2.CHROM and variant1.POS == variant2.POS and variant1.ID == variant2.ID
+def variant_sites_are_equivalent(variant1, variant2):
+    """Test if two variants are at the same site"""
+    return variant1.CHROM == variant2.CHROM and variant1.POS == variant2.POS
+
+
+def variant_alleles_are_equivalent(variant1, variant2):
+    """Test if two variants represent equivalent alleles"""
+
+    # by ID
+    # return variant_sites_are_equivalent(variant1, variant2) and variant1.ID == variant2.ID
+
+    # by REF/ALT
+    return variant_sites_are_equivalent(variant1, variant2) and variant1.REF == variant2.REF and variant1.ALT == variant2.ALT
 
 
 @click.command()
@@ -50,8 +60,11 @@ def cli(vcf_file, variants_vcf_file, output) -> None:
         writer.write_header()
         prev = None
         for variant in variants_vcf:
-            v = prev or next(vcf)
-            if variants_are_equivalent(variant, v):
+            if prev is not None and variant_sites_are_equivalent(variant, prev):
+                v = prev
+            else:
+                v = next(vcf)
+            if variant_alleles_are_equivalent(variant, v):
                 writer.write_record(v)
                 prev = None
             else:
