@@ -29,10 +29,17 @@ def open_vcf(path) -> Iterator[cyvcf2.VCF]:
         vcf.close()
 
 
-def cmp_variants(variant1, variant2):
+def cmp_variants(variant1, variant2, contigs):
     if variant1.CHROM != variant2.CHROM:
-        raise ValueError("Cannot compare variants with different CHROM")
+        c1 = contigs.index(variant1.CHROM)
+        c2 = contigs.index(variant2.CHROM)
+        return int(c1 > c2) - int(c1 < c2) 
     return int(variant1.POS > variant2.POS) - int(variant1.POS < variant2.POS) 
+
+
+def variant_sites_equal(variant1, variant2):
+    """Test if two variants have the same CHROM and POS"""
+    return variant1.CHROM == variant2.CHROM and variant1.POS == variant2.POS
 
 
 def variant_is_not_after(variant1, variant2):
@@ -113,7 +120,7 @@ def merge_lists(l1: list, l2: list, *, key: Callable[[Any], Any] = lambda x: x) 
     return [items[k] for k in result_keys]
 
 
-def merge(variants1, variants2):
+def merge(variants1, variants2, contigs):
     it1, it2 = peekable(variants1), peekable(variants2)
 
     while True:
@@ -125,7 +132,7 @@ def merge(variants1, variants2):
         if v2 is None:
             yield from it1
             break
-        c = cmp_variants(v1, v2)
+        c = cmp_variants(v1, v2, contigs)
         if c < 0:
             yield next(it1)
         elif c > 0:
@@ -135,7 +142,7 @@ def merge(variants1, variants2):
             v1 = next(it1)
             v1s = [v1]
             try:
-                while cmp_variants(v1, it1.peek()) == 0:
+                while variant_sites_equal(v1, it1.peek()):
                     v1s.append(next(it1))
             except StopIteration:
                 pass
@@ -143,7 +150,7 @@ def merge(variants1, variants2):
             v2 = next(it2)
             v2s = [v2]
             try:
-                while cmp_variants(v2, it2.peek()) == 0:
+                while variant_sites_equal(v2, it2.peek()):
                     v2s.append(next(it2))
             except StopIteration:
                 pass
@@ -165,10 +172,13 @@ def merge(variants1, variants2):
 def cli(vcf_file1, vcf_file2, output) -> None:
     """Merge the variants in VCF_FILE1 with VCF_FILE2"""
     with open_vcf(vcf_file1) as vcf1, open_vcf(vcf_file2) as vcf2:
+        if vcf1.seqnames != vcf2.seqnames:
+            raise ValueError(f"Contigs differ between {vcf_file1} and {vcf_file2}")
+
         writer = cyvcf2.Writer(output, vcf1)
         writer.write_header()
 
-        for variant in merge(vcf1, vcf2):
+        for variant in merge(vcf1, vcf2, vcf1.seqnames):
             writer.write_record(variant)
 
 
