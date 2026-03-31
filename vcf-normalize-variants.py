@@ -25,19 +25,19 @@ def open_vcf(path) -> Iterator[cyvcf2.VCF]:
         vcf.close()
 
 
-def variant_sites_are_equivalent(variant1, variant2):
-    """Test if two variants are at the same site"""
-    return variant1.CHROM == variant2.CHROM and variant1.POS == variant2.POS
+def variant_is_not_after(variant1, variant2):
+    """Test if variant 1 is not after variant 2 along the genome"""
+    return variant1.CHROM == variant2.CHROM and variant1.POS <= variant2.POS
 
 
 def variant_alleles_are_equivalent(variant1, variant2):
     """Test if two variants represent equivalent alleles"""
 
     # by ID
-    # return variant_sites_are_equivalent(variant1, variant2) and variant1.ID == variant2.ID
+    # return variant1.CHROM == variant2.CHROM and variant1.POS == variant2.POS and variant1.ID == variant2.ID
 
     # by REF/ALT
-    return variant_sites_are_equivalent(variant1, variant2) and variant1.REF == variant2.REF and variant1.ALT == variant2.ALT
+    return variant1.CHROM == variant2.CHROM and variant1.POS == variant2.POS and variant1.REF == variant2.REF and variant1.ALT == variant2.ALT
 
 
 @click.command()
@@ -62,7 +62,7 @@ def cli(vcf_file, variants_vcf_file, output) -> None:
         prev = None
         for variant in variants_vcf:
             if prev is not None:
-                if variant_sites_are_equivalent(variant, prev):
+                if variant_is_not_after(variant, prev):
                     v = prev
                 else:
                     raise ValueError(f"Variant not found in VARIANTS_VCF_FILE: {prev}")
