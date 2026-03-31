@@ -54,14 +54,18 @@ def cli(vcf_file, variants_vcf_file, output) -> None:
     """Normalise the variants in VCF_FILE to the defined list in VARIANTS_VCF_FILE.
     For each variant in VARIANTS_VCF_FILE, if VCF_FILE contains the variant
     then emit that record, otherwise emit an empty record at that site.
+    It is an error if a variant from VCF_FILE is not found in VARIANTS_VCF_FILE.
     """
     with open_vcf(vcf_file) as vcf, open_vcf(variants_vcf_file) as variants_vcf:
         writer = cyvcf2.Writer(output, vcf)
         writer.write_header()
         prev = None
         for variant in variants_vcf:
-            if prev is not None and variant_sites_are_equivalent(variant, prev):
-                v = prev
+            if prev is not None:
+                if variant_sites_are_equivalent(variant, prev):
+                    v = prev
+                else:
+                    raise ValueError(f"Variant not found in VARIANTS_VCF_FILE: {prev}")
             else:
                 v = next(vcf)
             if variant_alleles_are_equivalent(variant, v):
