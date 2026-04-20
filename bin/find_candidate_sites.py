@@ -1,9 +1,13 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+# ///
 """Find sites with multiple records where at least one is multiallelic.
 
 These are the sites where the bcftools anchor algorithm and connected-components
 may disagree — disagreement requires 3+ records with at least one multiallelic.
 
-Usage: python find_candidate_sites.py input.vcf[.gz]
+Usage: uv run find_candidate_sites.py input.vcf[.gz]
 """
 
 import subprocess
@@ -14,14 +18,14 @@ from itertools import groupby
 
 def find_candidate_sites(vcf_path: str) -> list[tuple[str, str]]:
     result = subprocess.run(
-        ["bcftools", "query", "-f", "%CHROM\t%POS\t%N_ALT\n", vcf_path],
+        ["bcftools", "query", "-f", "%CHROM\t%POS\t%ALT\n", vcf_path],
         capture_output=True, text=True, check=True,
     )
     rows = (line.split("\t") for line in result.stdout.splitlines())
     candidates = []
     for (chrom, pos), group in groupby(rows, key=lambda r: (r[0], r[1])):
         records = list(group)
-        if len(records) > 1 and any(int(r[2]) > 1 for r in records):
+        if len(records) > 1 and any(len(r[2].split(",")) > 1 for r in records):
             candidates.append((chrom, pos))
     return candidates
 
